@@ -15,7 +15,7 @@ from astra.model.loss import Loss
 
 if __name__ == "__main__":
 
-    repo_root = "/Users/amithkamath/repo/astra/"
+    repo_root = "/Users/zahir/Documents/Github/astra/"
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--batch_size", type=int, default=2, help="batch size for training (default: 2)"
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     #  Start training
     trainer = NetworkTrainer()
     trainer.setting.project_name = "C3D"
-    trainer.setting.output_dir = os.path.join(repo_root, "/models/dldp-test")
+    trainer.setting.output_dir = os.path.join(repo_root, "models", "dldp-test")
     list_GPU_ids = args.list_GPU_ids
 
     trainer.setting.network = Model(

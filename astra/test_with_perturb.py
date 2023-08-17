@@ -64,7 +64,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
     with torch.no_grad():
         trainer.setting.network.eval()
         for patient_dir in list_patient_dirs:
-            patient_id = patient_dir.split("/")[-1]
+            patient_id = patient_dir.split("\\")[-1]
 
             dict_images = read_data(patient_dir)
 
@@ -89,11 +89,11 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
             templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
             prediction_nii = sitk.GetImageFromArray(gt_prediction)
             prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
-            if not os.path.exists(save_path + "/" + patient_id):
-                os.mkdir(save_path + "/" + patient_id)
+            if not os.path.exists(save_path + "\\" + patient_id):
+                os.mkdir(save_path + "\\" + patient_id)
             sitk.WriteImage(
                 prediction_nii,
-                save_path + "/" + patient_id + "/Dose_gt.nii.gz",
+                save_path + "\\" + patient_id + "/Dose_gt.nii.gz",
             )
 
             list_OAR_names = ["Target"]
@@ -140,22 +140,22 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
                 prediction_nii = sitk.GetImageFromArray(perturb_prediction)
                 prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
-                if not os.path.exists(save_path + "/" + patient_id):
-                    os.mkdir(save_path + "/" + patient_id)
+                if not os.path.exists(save_path + "\\" + patient_id):
+                    os.mkdir(save_path + "\\" + patient_id)
                 sitk.WriteImage(
                     prediction_nii,
-                    save_path + "/" + patient_id + "/Perturbed_" + oar + ".nii.gz",
+                    save_path + "\\" + patient_id + "/Perturbed_" + oar + ".nii.gz",
                 )
 
 
 if __name__ == "__main__":
 
-    root_dir = "/Users/amithkamath/repo/astra"
+    root_dir = "/Users/zahir/Documents/Github/astra/"
     model_dir = os.path.join(root_dir, "models")
     output_dir = os.path.join(root_dir, "output_perturb")
     os.makedirs(output_dir, exist_ok=True)
 
-    gt_dir = os.path.join(root_dir, "data/processed-dldp")
+    gt_dir = os.path.join(root_dir, "data", "processed-dldp")
     test_dir = gt_dir  # change this if somewhere else.
 
     if not os.path.exists(model_dir):
