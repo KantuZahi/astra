@@ -1,10 +1,12 @@
 # -*- encoding: utf-8 -*-
 import os
+import platform
 import sys
 import argparse
 import numpy as np
 import SimpleITK as sitk
 import skimage.morphology as skm
+import random
 from tqdm import tqdm
 
 if os.path.abspath("..") not in sys.path:
@@ -53,19 +55,35 @@ def dilate_at(volume, point):
     volume_out = volume_out[np.newaxis, :, :, :]
     return volume_out
 
+def erode_at(volume, point):
+    """
+    Erode the binary volume 'volume' at the point specified bt point.
+    """
+    ball = skm.ball(3)
+    point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
+    point_vol[point[0], point[1], point[2]] = 1
+    volume_out = skm.binary_erosion(point_vol, ball).astype(np.uint8)
+    volume_out += volume[0, :, :, :].astype(np.uint8)
+    volume_out[volume_out >= 1] = 1
+    volume_out = volume_out[np.newaxis, :, :, :]
+    return volume_out
 
 def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=True):
     """
-    This function helps create perturbations in the OAR, and then evaluates the dose.
+    This function helps create perturbations in the OAR and the Target, and then evaluates the dose.
     """
+    sys = platform.system()
+
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
     with torch.no_grad():
         trainer.setting.network.eval()
         for patient_dir in list_patient_dirs:
-            patient_id = patient_dir.split("\\")[-1]
-
+            if sys == 'Windows':
+                patient_id = patient_dir.split("\\")[-1]
+            else:
+                patient_id = patient_dir.split("/")[-1]
             dict_images = read_data(patient_dir)
 
             list_images = pre_processing(dict_images)
@@ -89,29 +107,48 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
             templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
             prediction_nii = sitk.GetImageFromArray(gt_prediction)
             prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
-            if not os.path.exists(save_path + "\\" + patient_id):
-                os.mkdir(save_path + "\\" + patient_id)
-            sitk.WriteImage(
-                prediction_nii,
-                save_path + "\\" + patient_id + "/Dose_gt.nii.gz",
-            )
 
-            list_OAR_names = ["Target"]
+            # if not os.path.exists(os.path.join('save_path', 'patient_id')):
+            #     os.mkdir(os.path.join('save_path', 'patient_id'))
+            # sitk.WriteImage(
+            #     prediction_nii,
+            #     os.path.join('save_path', 'patient_id', "Dose_gt.nii.gz",
+            # )
 
-            for oar in list_OAR_names:
+            if sys == 'Windows':
+                if not os.path.exists(save_path + "\\" + patient_id):
+                    os.mkdir(save_path + "\\" + patient_id)
+                sitk.WriteImage(
+                    prediction_nii,
+                    save_path + "\\" + patient_id + "/Dose_gt.nii.gz",
+                )
+            else:
+                if not os.path.exists(save_path + "/" + patient_id):
+                    os.mkdir(save_path + "/" + patient_id)
+                sitk.WriteImage(
+                    prediction_nii,
+                    save_path + "/" + patient_id + "/Dose_gt.nii.gz",
+                )
 
-                print("Working on: ", oar.split("_")[0])
+            list_target = ["Target"]
+            list_oar_names = ["BrainStem", "Chiasm", "Cochlea_L", "Cochlea_R", "Eye_L", "Eye_R", "Hippocampus_L", "Hippocampus_R", "LacrimalGland_L", "LacrimalGland_R", "OpticNerve_L", "OpticNerve_R", "Pituitary"]
+
+
+            for organ in list_target:
+
+                print("Working on: ", organ.split("_")[0])
 
                 perturb_prediction = np.zeros_like(gt_prediction)
 
-                point_set = find_boundary_points(dict_images[oar])
+                point_set = find_boundary_points(dict_images[organ])
 
                 print("Points on surface: ", len(point_set))
 
-                # At this stage, do perturbation on the OAR boundary.
+
+                # At this stage, do perturbation on the organ boundary.
                 for point in tqdm(point_set):
 
-                    dict_images[oar] = dilate_at(dict_images[oar], point)
+                    dict_images[organ] = dilate_at(dict_images[organ], point)
 
                     list_images = pre_processing(dict_images)
 
@@ -134,23 +171,36 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     prediction = 70.0 * prediction
 
                     absdiff = np.sum(np.abs(gt_prediction - prediction))
+                    # grad = np.gradient(prediction[point])
 
                     perturb_prediction[point[0], point[1], point[2]] = absdiff
+                    # perturb_prediction[point[0], point[1], point[2]] = np.array(grad)
+
 
                 templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
                 prediction_nii = sitk.GetImageFromArray(perturb_prediction)
+                # prediction_nii = sitk.GetImageFromArray(prediction)
                 prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
-                if not os.path.exists(save_path + "\\" + patient_id):
-                    os.mkdir(save_path + "\\" + patient_id)
-                sitk.WriteImage(
-                    prediction_nii,
-                    save_path + "\\" + patient_id + "/Perturbed_" + oar + ".nii.gz",
-                )
+                if sys == 'Windows':
+                    if not os.path.exists(save_path + "\\" + patient_id):
+                        os.mkdir(save_path + "\\" + patient_id)
+                    sitk.WriteImage(
+                        prediction_nii,
+                        save_path + "\\" + patient_id + "/Perturbed_" + organ + ".nii.gz",
+                    )
+                else:
+                    if not os.path.exists(save_path + "/" + patient_id):
+                        os.mkdir(save_path + "/" + patient_id)
+                    sitk.WriteImage(
+                        prediction_nii,
+                        save_path + "/" + patient_id + "/Perturbed_" + organ + ".nii.gz",
+                    )
 
 
 if __name__ == "__main__":
 
     root_dir = "/Users/zahir/Documents/Github/astra/"
+    # root_dir = os.getcwd()
     model_dir = os.path.join(root_dir, "models")
     output_dir = os.path.join(root_dir, "output_perturb")
     os.makedirs(output_dir, exist_ok=True)
@@ -177,11 +227,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    trainer = NetworkTrainer()
-    trainer.setting.project_name = "C3D"
-    trainer.setting.output_dir = output_dir
+    trainer_ = NetworkTrainer()
+    trainer_.setting.project_name = "C3D"
+    trainer_.setting.output_dir = output_dir
 
-    trainer.setting.network = Model(
+    trainer_.setting.network = Model(
         in_ch=15,
         out_ch=1,
         list_ch_A=[-1, 16, 32, 64, 128, 256],
@@ -189,18 +239,18 @@ if __name__ == "__main__":
     )
 
     # Load model weights
-    trainer.init_trainer(
+    trainer_.init_trainer(
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [81, 82]:
+    for subject_id in [90]:
 
         # Start inference
         print("\n\n# Start inference !")
         list_patient_dirs = [os.path.join(test_dir, "DLDP_" + str(subject_id).zfill(3))]
         inference_with_perturbation(
-            trainer,
+            trainer_,
             list_patient_dirs,
-            save_path=os.path.join(trainer.setting.output_dir, "Prediction"),
+            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_Grad"),
             do_TTA=args.TTA,
         )
