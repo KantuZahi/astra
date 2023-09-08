@@ -46,7 +46,7 @@ def dilate_at(volume, point):
     """
     Dilate the binary volume 'volume' at the point specified bt point.
     """
-    ball = skm.ball(3)
+    ball = skm.ball(9)
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
     point_vol[point[0], point[1], point[2]] = 1
     volume_out = skm.binary_dilation(point_vol, ball).astype(np.uint8)
@@ -59,12 +59,12 @@ def erode_at(volume, point):
     """
     Erode the binary volume 'volume' at the point specified bt point.
     """
-    ball = skm.ball(3)
+    ball = skm.ball(9)
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
     point_vol[point[0], point[1], point[2]] = 1
-    volume_out = skm.binary_erosion(point_vol, ball).astype(np.uint8)
-    volume_out += volume[0, :, :, :].astype(np.uint8)
-    volume_out[volume_out >= 1] = 1
+    volume_out = skm.binary_dilation(point_vol, ball).astype(np.uint8)
+    volume_out = volume[0, :, :, :].astype(np.uint8) - volume_out
+    volume_out[volume_out >= 2] = 0
     volume_out = volume_out[np.newaxis, :, :, :]
     return volume_out
 
@@ -251,6 +251,6 @@ if __name__ == "__main__":
         inference_with_perturbation(
             trainer_,
             list_patient_dirs,
-            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_Grad"),
+            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_Dilation9"),
             do_TTA=args.TTA,
         )
