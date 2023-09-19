@@ -1,0 +1,4 @@
+#!/bin/bash
+. /home/mzahira/astra
+source venv/bin/activate
+CUDA_VISIBLE_DEVICES=4  python main.py

@@ -1,0 +1,4 @@
+#!/bin/bash
+. /home/mzahira/astra
+source venv/bin/activate
+python main.py

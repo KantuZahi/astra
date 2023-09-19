@@ -6,7 +6,6 @@ import argparse
 import numpy as np
 import SimpleITK as sitk
 import skimage.morphology as skm
-import random
 from tqdm import tqdm
 
 if os.path.abspath("..") not in sys.path:
@@ -27,7 +26,7 @@ def find_boundary_points(volume):
     Find points on the boundary of a region of interest.
     These points will then be used to create perturbations.
     """
-    ball = skm.ball(3)
+    ball = skm.ball(2)
     volume_larger = skm.binary_dilation(volume[0, :, :, :], ball)
     boundary_volume = volume_larger - volume[0, :, :, :]
     points = np.nonzero(boundary_volume)
@@ -41,12 +40,30 @@ def find_boundary_points(volume):
         out_points.append([x, y, z])
     return out_points
 
+def find_boundary_points_CTV(volume):
+    """
+    Find points on the boundary of a region of interest.
+    These points will then be used to create perturbations.
+    """
+    ball = skm.ball(2)
+    volume_smaller = skm.binary_erosion(volume[0, :, :, :], ball)
+    boundary_rim = volume[0, :, :, :] - volume_smaller
+    points = np.nonzero(boundary_rim)
+    out_points = []
+
+    # Choose 10 here to sub-sample the surface. Need to think of a better way to do this.
+    for idx in range(0, len(points[0]),5):
+        x = points[0][idx]
+        y = points[1][idx]
+        z = points[2][idx]
+        out_points.append([x, y, z])
+    return out_points
 
 def dilate_at(volume, point):
     """
     Dilate the binary volume 'volume' at the point specified bt point.
     """
-    ball = skm.ball(9)
+    ball = skm.ball(3)
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
     point_vol[point[0], point[1], point[2]] = 1
     volume_out = skm.binary_dilation(point_vol, ball).astype(np.uint8)
@@ -59,7 +76,7 @@ def erode_at(volume, point):
     """
     Erode the binary volume 'volume' at the point specified bt point.
     """
-    ball = skm.ball(9)
+    ball = skm.ball(3)
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
     point_vol[point[0], point[1], point[2]] = 1
     volume_out = skm.binary_dilation(point_vol, ball).astype(np.uint8)
@@ -108,12 +125,6 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
             prediction_nii = sitk.GetImageFromArray(gt_prediction)
             prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
 
-            # if not os.path.exists(os.path.join('save_path', 'patient_id')):
-            #     os.mkdir(os.path.join('save_path', 'patient_id'))
-            # sitk.WriteImage(
-            #     prediction_nii,
-            #     os.path.join('save_path', 'patient_id', "Dose_gt.nii.gz",
-            # )
 
             if sys == 'Windows':
                 if not os.path.exists(save_path + "\\" + patient_id):
@@ -131,16 +142,46 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 )
 
             list_target = ["Target"]
-            list_oar_names = ["BrainStem", "Chiasm", "Cochlea_L", "Cochlea_R", "Eye_L", "Eye_R", "Hippocampus_L", "Hippocampus_R", "LacrimalGland_L", "LacrimalGland_R", "OpticNerve_L", "OpticNerve_R", "Pituitary"]
+            list_oar_names = ["BrainStem", "Eye_L", "Eye_R", "Hippocampus_L", "Hippocampus_R"] # , "Chiasm", "Cochlea_L", "Cochlea_R", "LacrimalGland_L", "LacrimalGland_R", "OpticNerve_L", "OpticNerve_R", "Pituitary"]
 
 
             for organ in list_target:
 
                 print("Working on: ", organ.split("_")[0])
 
-                perturb_prediction = np.zeros_like(gt_prediction)
+                perturb_prediction = {}
+                perturb_prediction[organ] = np.zeros_like(gt_prediction)
+                test_tv = perturb_prediction[organ]
 
-                point_set = find_boundary_points(dict_images[organ])
+                for oar in list_oar_names:
+                    perturb_prediction[oar] = np.zeros_like(gt_prediction)
+
+                prediction_tv = np.zeros_like(gt_prediction)
+                prediction_tv = np.multiply(gt_prediction, dict_images[organ][0,:,:,:])
+
+                templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
+                prediction_nii = sitk.GetImageFromArray(prediction_tv)
+                prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
+                if sys == 'Windows':
+                    if not os.path.exists(save_path + "\\" + patient_id):
+                        os.mkdir(save_path + "\\" + patient_id)
+                    sitk.WriteImage(
+                        prediction_nii,
+                        save_path + "\\" + patient_id + "/Prediction_NoPert" + organ + ".nii.gz",
+                    )
+                else:
+                    if not os.path.exists(save_path + "/" + patient_id):
+                        os.mkdir(save_path + "/" + patient_id)
+                    sitk.WriteImage(
+                        prediction_nii,
+                        save_path + "/" + patient_id + "/Prediction_NoPert" + organ + ".nii.gz",
+                    )
+
+                ### Use this to get boundary on the CTV
+                point_set = find_boundary_points_CTV(dict_images[organ])
+
+                ### Use this to get boundary on a imaginary PTV at n voxels away from the CTV
+                # point_set = find_boundary_points(dict_images[organ])
 
                 print("Points on surface: ", len(point_set))
 
@@ -148,7 +189,10 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 # At this stage, do perturbation on the organ boundary.
                 for point in tqdm(point_set):
 
-                    dict_images[organ] = dilate_at(dict_images[organ], point)
+                    ### put CTV into erode/ dilate function
+                    # dict_images[organ] = dilate_at(dict_images[organ], point)
+                    dict_images[organ] = erode_at(dict_images[organ], point)
+
 
                     list_images = pre_processing(dict_images)
 
@@ -168,18 +212,64 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                             possible_dose_mask[0, :, :, :] < 1, prediction < 0
                         )
                     ] = 0
+                    # rescale and get gray (Gy)
                     prediction = 70.0 * prediction
 
-                    absdiff = np.sum(np.abs(gt_prediction - prediction))
-                    # grad = np.gradient(prediction[point])
+                    # max/mean value of oar written into perturb location
+                    for oar in list_oar_names:
+                        temp_pred_gt = np.multiply(gt_prediction, dict_images[oar])
+                        temp_pred_pert = np.multiply(prediction,dict_images[oar])
+                        absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
+                        # max_val_pert = np.max(temp_pred_pert)
+                        # max_val_gt = np.max(temp_pred_gt)
+                        deltamax = np.max(temp_pred_gt - temp_pred_pert)
 
-                    perturb_prediction[point[0], point[1], point[2]] = absdiff
-                    # perturb_prediction[point[0], point[1], point[2]] = np.array(grad)
+                        perturb_prediction[oar][point[0], point[1], point[2]] = deltamax
 
 
+                        test1 = perturb_prediction[oar]
+                        b=1
+                    test2 = perturb_prediction[organ]
+                    a=1
+
+
+
+                    absdiff = np.sum(np.abs(np.multiply(gt_prediction, dict_images[organ]) - np.multiply(prediction,dict_images[organ])))
+                    deltamax = np.max(np.multiply(gt_prediction, dict_images[organ]) - np.multiply(prediction,dict_images[organ]))
+                    # perturb_prediction[organ][point[0], point[1], point[2]] = absdiff
+                    # perturb_prediction[organ][point[0], point[1], point[2]] = deltamax
+                    # perturb_prediction[organ][point[0], point[1], point[2]] = prediction[point[0], point[1], point[2]]
+                    perturb_prediction[organ] = np.multiply(prediction, dict_images[organ])
+                    test_noP = perturb_prediction[organ]
+                    a=1
+
+                    
+
+
+                for oar in list_oar_names:
+                    test3 = perturb_prediction[oar]
+                    templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
+                    prediction_nii = sitk.GetImageFromArray(perturb_prediction[oar])
+                    # prediction_nii = sitk.GetImageFromArray(prediction)
+                    prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
+                    if sys == 'Windows':
+                        if not os.path.exists(save_path + "\\" + patient_id):
+                            os.mkdir(save_path + "\\" + patient_id)
+                        sitk.WriteImage(
+                            prediction_nii,
+                            save_path + "\\" + patient_id + "/Perturbed_" + oar + ".nii.gz",
+                        )
+                    else:
+                        if not os.path.exists(save_path + "/" + patient_id):
+                            os.mkdir(save_path + "/" + patient_id)
+                        sitk.WriteImage(
+                            prediction_nii,
+                            save_path + "/" + patient_id + "/Perturbed_" + oar + ".nii.gz",
+                        )
+
+                temp_organ = perturb_prediction[organ]
                 templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
-                prediction_nii = sitk.GetImageFromArray(perturb_prediction)
-                # prediction_nii = sitk.GetImageFromArray(prediction)
+                prediction_nii = sitk.GetImageFromArray(perturb_prediction[organ])
                 prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
                 if sys == 'Windows':
                     if not os.path.exists(save_path + "\\" + patient_id):
@@ -195,6 +285,10 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         prediction_nii,
                         save_path + "/" + patient_id + "/Perturbed_" + organ + ".nii.gz",
                     )
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -251,6 +345,7 @@ if __name__ == "__main__":
         inference_with_perturbation(
             trainer_,
             list_patient_dirs,
-            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_Dilation9"),
+            # save_path=os.path.join(trainer_.setting.output_dir, "Prediction_Dilation3_DeltaMax"),
+            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_E3_Test"),
             do_TTA=args.TTA,
         )
