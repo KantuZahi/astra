@@ -1,4 +1,3 @@
-# -*- encoding: utf-8 -*-
 import os
 import platform
 import sys
@@ -50,9 +49,11 @@ def find_boundary_points_CTV(volume):
     boundary_rim = volume[0, :, :, :] - volume_smaller
     points = np.nonzero(boundary_rim)
     out_points = []
+    size = np.count_nonzero(boundary_rim)
+
 
     # Choose 10 here to sub-sample the surface. Need to think of a better way to do this.
-    for idx in range(0, len(points[0]),3):
+    for idx in range(0, len(points[0]),int(size/3)):
         x = points[0][idx]
         y = points[1][idx]
         z = points[2][idx]
@@ -72,7 +73,6 @@ def dilate_at(volume, point):
     volume_out += volume[0, :, :, :].astype(np.uint8)
     volume_out[volume_out >= 1] = 1
     volume_out = volume_out[np.newaxis, :, :, :]
-    print(str(np.count_nonzero(volume_out)))
     return volume_out
 
 def erode_at(volume, point):
@@ -88,7 +88,6 @@ def erode_at(volume, point):
     volume_out = volume[0, :, :, :].astype(np.uint8) - volume_out
     volume_out[volume_out >= 2] = 0
     volume_out = volume_out[np.newaxis, :, :, :]
-    print(str(np.count_nonzero(volume_out)))
     return volume_out
 
 def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=True):
@@ -156,10 +155,16 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 print("Working on: ", organ.split("_")[0])
 
                 perturb_prediction = {}
+                prediction_gt = {}
+                prediction_diff = {}
                 perturb_prediction[organ] = np.zeros_like(gt_prediction)
+                prediction_gt[organ] = np.zeros_like(gt_prediction)
+                prediction_diff[organ] = np.zeros_like(gt_prediction)
 
                 for oar in list_oar_names:
                     perturb_prediction[oar] = np.zeros_like(gt_prediction)
+                    prediction_gt[oar] = np.zeros_like(gt_prediction)
+                    prediction_diff[oar] = np.zeros_like(gt_prediction)
 
                 prediction_tv = np.zeros_like(gt_prediction)
                 prediction_tv += np.multiply(gt_prediction, dict_images[organ][0,:,:,:])
@@ -193,14 +198,12 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
                 # At this stage, do perturbation on the organ boundary.
                 for point in tqdm(point_set):
-
+                    changed_mask = np.zeros_like(gt_prediction)
                     ### put CTV into erode/ dilate function
                     # dict_images[organ] = dilate_at(dict_images[organ], point)
                     # dict_images[organ] = erode_at(dict_images[organ], point)
-
                     # changed_mask = dilate_at(dict_images[organ], point)
                     changed_mask = erode_at(dict_images[organ], point)
-
 
                     list_images = pre_processing(dict_images)
 
@@ -226,62 +229,117 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     # max/mean value of oar written into perturb location
                     for oar in list_oar_names:
                         temp_pred_gt = np.multiply(gt_prediction, dict_images[oar])
+                        test = temp_pred_gt
                         temp_pred_pert = np.multiply(prediction,dict_images[oar])
-                        absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
-                        # max_val_pert = np.max(temp_pred_pert)
-                        # max_val_gt = np.max(temp_pred_gt)
-                        max_gt = np.max(temp_pred_gt)
-                        max_pert = np.max(temp_pred_pert)
-                        deltamax = np.max(np.abs(temp_pred_gt - temp_pred_pert))
+                        # absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
+                        # # max_val_pert = np.max(temp_pred_pert)
+                        # # max_val_gt = np.max(temp_pred_gt)
+                        # max_gt = np.max(temp_pred_gt)
+                        # max_pert = np.max(temp_pred_pert)
+                        # deltamax = np.max(np.abs(temp_pred_gt - temp_pred_pert))
+                        #
+                        # perturb_prediction[oar][point[0], point[1], point[2]] = deltamax
 
-                        perturb_prediction[oar][point[0], point[1], point[2]] = max_pert
+                        perturb_prediction[oar] = temp_pred_pert[0, :, :, :]
+                        prediction_gt[oar] = temp_pred_gt[0, :, :, :]
+                        prediction_diff[oar] = np.absolute(perturb_prediction[oar]- prediction_gt[oar])
 
-                    temp_pred_gt = np.multiply(gt_prediction, changed_mask)
-                    temp_pred_pert = np.multiply(prediction, changed_mask)
-                    absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
-                    deltamax = np.max(np.abs(temp_pred_gt - temp_pred_pert))
-                    max_gt_tv = np.max(temp_pred_gt)
-                    max_pert_tv = np.max(temp_pred_pert)
+                        templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
+                        prediction_nii = sitk.GetImageFromArray(perturb_prediction[oar])
+                        prediction_gt_nii = sitk.GetImageFromArray(perturb_prediction[oar])
+                        prediction_diff_nii = sitk.GetImageFromArray(perturb_prediction[oar])
+
+                        prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
+                        prediction_gt_nii = copy_sitk_imageinfo(templete_nii, prediction_gt_nii)
+                        prediction_diff_nii = copy_sitk_imageinfo(templete_nii, prediction_diff_nii)
+
+                        if sys == 'Windows':
+                            if not os.path.exists(save_path + "\\" + patient_id):
+                                os.mkdir(save_path + "\\" + patient_id)
+                            sitk.WriteImage(
+                                prediction_nii,
+                                save_path + "\\" + patient_id + "/Perturbed_" + oar + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                            )
+                            sitk.WriteImage(
+                                prediction_gt_nii,
+                                save_path + "\\" + patient_id + "/gt_" + oar + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                            )
+                            sitk.WriteImage(
+                                prediction_diff_nii,
+                                save_path + "\\" + patient_id + "/diff_" + oar + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                            )
+                        else:
+                            if not os.path.exists(save_path + "/" + patient_id):
+                                os.mkdir(save_path + "/" + patient_id)
+                            sitk.WriteImage(
+                                prediction_nii,
+                                save_path + "/" + patient_id + "/Perturbed_" + oar + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                            )
+                            sitk.WriteImage(
+                                prediction_gt_nii,
+                                save_path + "/" + patient_id + "/gt_" + oar + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                            )
+                            sitk.WriteImage(
+                                prediction_diff_nii,
+                                save_path + "/" + patient_id + "/diff_" + oar + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                            )
+
+
+
+
+                    temp_pred_pert_tv = np.multiply(gt_prediction, changed_mask)
+                    temp_pred_gt = np.multiply(prediction,changed_mask)
+                    absdiff = np.sum(np.abs(np.multiply(gt_prediction, changed_mask) - np.multiply(prediction,changed_mask)))
+                    deltamax = np.max(np.abs(np.multiply(gt_prediction, changed_mask) - np.multiply(prediction,changed_mask)))
                     # perturb_prediction[organ][point[0], point[1], point[2]] = absdiff
-                    perturb_prediction[organ][point[0], point[1], point[2]] = max_pert_tv
+                    perturb_prediction[organ] = temp_pred_pert_tv[0, :, :, :]
+                    test_p_tv = perturb_prediction[organ]
+                    prediction_gt[organ] = temp_pred_gt[0, :, :, :]
+                    test_gt_tv = prediction_gt[organ]
 
 
-                for oar in list_oar_names:
+
                     templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
-                    prediction_nii = sitk.GetImageFromArray(perturb_prediction[oar])
+                    prediction_nii = sitk.GetImageFromArray(perturb_prediction[organ])
+                    prediction_gt_nii = sitk.GetImageFromArray(perturb_prediction[organ])
+                    prediction_diff_nii = sitk.GetImageFromArray(perturb_prediction[organ])
+
                     prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
+                    prediction_gt_nii = copy_sitk_imageinfo(templete_nii, prediction_gt_nii)
+                    prediction_diff_nii = copy_sitk_imageinfo(templete_nii, prediction_diff_nii)
+
                     if sys == 'Windows':
                         if not os.path.exists(save_path + "\\" + patient_id):
                             os.mkdir(save_path + "\\" + patient_id)
                         sitk.WriteImage(
                             prediction_nii,
-                            save_path + "\\" + patient_id + "/Perturbed_T" + oar + ".nii.gz",
+                            save_path + "\\" + patient_id + "/Perturbed_" + organ + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
                         )
+                        sitk.WriteImage(
+                            prediction_gt_nii,
+                            save_path + "\\" + patient_id + "/gt_" + organ + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                        )
+                        sitk.WriteImage(
+                            prediction_diff_nii,
+                            save_path + "\\" + patient_id + "/diff_" + organ + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                        )
+
                     else:
                         if not os.path.exists(save_path + "/" + patient_id):
                             os.mkdir(save_path + "/" + patient_id)
                         sitk.WriteImage(
                             prediction_nii,
-                            save_path + "/" + patient_id + "/Perturbed_T" + oar + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_" + organ + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                        )
+                        sitk.WriteImage(
+                            prediction_gt_nii,
+                            save_path + "/" + patient_id + "/gt_" + organ + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
+                        )
+                        sitk.WriteImage(
+                            prediction_diff_nii,
+                            save_path + "/" + patient_id + "/diff" + organ + str(point[0]) + "_" + str(point[1]) + "_" + str(point[2]) + ".nii.gz",
                         )
 
-                templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
-                prediction_nii = sitk.GetImageFromArray(perturb_prediction[organ])
-                prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
-                if sys == 'Windows':
-                    if not os.path.exists(save_path + "\\" + patient_id):
-                        os.mkdir(save_path + "\\" + patient_id)
-                    sitk.WriteImage(
-                        prediction_nii,
-                        save_path + "\\" + patient_id + "/Perturbed_" + organ + ".nii.gz",
-                    )
-                else:
-                    if not os.path.exists(save_path + "/" + patient_id):
-                        os.mkdir(save_path + "/" + patient_id)
-                    sitk.WriteImage(
-                        prediction_nii,
-                        save_path + "/" + patient_id + "/Perturbed_" + organ + ".nii.gz",
-                    )
 
 
 
@@ -342,6 +400,6 @@ if __name__ == "__main__":
         inference_with_perturbation(
             trainer_,
             list_patient_dirs,
-            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_D3_DMax"),
+            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_SinglePert_D12"),
             do_TTA=args.TTA,
         )
