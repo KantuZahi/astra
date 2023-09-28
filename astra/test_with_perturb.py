@@ -64,15 +64,15 @@ def dilate_at(volume, point):
     Dilate the binary volume 'volume' at the point specified bt point.
     """
     ball = skm.ball(3)
-    print(str(np.count_nonzero(ball)))
-    print(str(np.count_nonzero(volume)))
+    # print(str(np.count_nonzero(ball)))
+    # print(str(np.count_nonzero(volume)))
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
     point_vol[point[0], point[1], point[2]] = 1
     volume_out = skm.binary_dilation(point_vol, ball).astype(np.uint8)
     volume_out += volume[0, :, :, :].astype(np.uint8)
     volume_out[volume_out >= 1] = 1
     volume_out = volume_out[np.newaxis, :, :, :]
-    print(str(np.count_nonzero(volume_out)))
+    # print(str(np.count_nonzero(volume_out)))
     return volume_out
 
 def erode_at(volume, point):
@@ -80,15 +80,15 @@ def erode_at(volume, point):
     Erode the binary volume 'volume' at the point specified bt point.
     """
     ball = skm.ball(3)
-    print(str(np.count_nonzero(ball)))
-    print(str(np.count_nonzero(volume)))
+    # print(str(np.count_nonzero(ball)))
+    # print(str(np.count_nonzero(volume)))
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
     point_vol[point[0], point[1], point[2]] = 1
     volume_out = skm.binary_dilation(point_vol, ball).astype(np.uint8)
     volume_out = volume[0, :, :, :].astype(np.uint8) - volume_out
     volume_out[volume_out >= 2] = 0
     volume_out = volume_out[np.newaxis, :, :, :]
-    print(str(np.count_nonzero(volume_out)))
+    # print(str(np.count_nonzero(volume_out)))
     return volume_out
 
 def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=True):
@@ -189,17 +189,15 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 # point_set = find_boundary_points(dict_images[organ])
 
                 print("\n Points on surface: ", len(point_set))
-
+                og_tv = dict_images[organ]
 
                 # At this stage, do perturbation on the organ boundary.
                 for point in tqdm(point_set):
-
+                    dict_images[organ] = og_tv
                     ### put CTV into erode/ dilate function
                     # dict_images[organ] = dilate_at(dict_images[organ], point)
-                    # dict_images[organ] = erode_at(dict_images[organ], point)
+                    dict_images[organ] = erode_at(dict_images[organ], point)
 
-                    # changed_mask = dilate_at(dict_images[organ], point)
-                    changed_mask = erode_at(dict_images[organ], point)
 
 
                     list_images = pre_processing(dict_images)
@@ -225,19 +223,19 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
                     # max/mean value of oar written into perturb location
                     for oar in list_oar_names:
-                        temp_pred_gt = np.multiply(gt_prediction, dict_images[oar])
-                        temp_pred_pert = np.multiply(prediction,dict_images[oar])
-                        absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
+                        temp_pred_gt_oar = np.multiply(gt_prediction, dict_images[oar])
+                        temp_pred_pert_oar = np.multiply(prediction,dict_images[oar])
+                        absdiff = np.sum(abs(temp_pred_gt_oar - temp_pred_pert_oar))
                         # max_val_pert = np.max(temp_pred_pert)
-                        # max_val_gt = np.max(temp_pred_gt)
-                        max_gt = np.max(temp_pred_gt)
-                        max_pert = np.max(temp_pred_pert)
-                        deltamax = np.max(np.abs(temp_pred_gt - temp_pred_pert))
+                        # max_val_gt = np.max(temp_pred_gt_oar)
+                        max_gt_oar = np.max(temp_pred_gt_oar)
+                        max_pert_oar = np.max(temp_pred_pert_oar)
+                        deltamax = np.max(np.abs(temp_pred_gt_oar - temp_pred_pert_oar))
 
-                        perturb_prediction[oar][point[0], point[1], point[2]] = max_pert
+                        perturb_prediction[oar][point[0], point[1], point[2]] = max_gt_oar
 
-                    temp_pred_gt = np.multiply(gt_prediction, changed_mask)
-                    temp_pred_pert = np.multiply(prediction, changed_mask)
+                    temp_pred_gt = np.multiply(gt_prediction, dict_images[organ])
+                    temp_pred_pert = np.multiply(prediction, dict_images[organ])
                     absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
                     deltamax = np.max(np.abs(temp_pred_gt - temp_pred_pert))
                     max_gt_tv = np.max(temp_pred_gt)
@@ -334,7 +332,7 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [90, 82, 81]:
+    for subject_id in [90, 82, 81, 95]:
 
         # Start inference
         print("\n\n# Start inference !")

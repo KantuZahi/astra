@@ -65,8 +65,8 @@ def dilate_at(volume, point):
     Dilate the binary volume 'volume' at the point specified bt point.
     """
     ball = skm.ball(3)
-    print(str(np.count_nonzero(ball)))
-    print(str(np.count_nonzero(volume)))
+    # print(str(np.count_nonzero(ball)))
+    # print(str(np.count_nonzero(volume)))
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
     point_vol[point[0], point[1], point[2]] = 1
     volume_out = skm.binary_dilation(point_vol, ball).astype(np.uint8)
@@ -79,9 +79,9 @@ def erode_at(volume, point):
     """
     Erode the binary volume 'volume' at the point specified bt point.
     """
-    ball = skm.ball(3)
-    print(str(np.count_nonzero(ball)))
-    print(str(np.count_nonzero(volume)))
+    ball = skm.ball(5)
+    # print(str(np.count_nonzero(ball)))
+    # print(str(np.count_nonzero(volume)))
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
     point_vol[point[0], point[1], point[2]] = 1
     volume_out = skm.binary_dilation(point_vol, ball).astype(np.uint8)
@@ -202,8 +202,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     ### put CTV into erode/ dilate function
                     # dict_images[organ] = dilate_at(dict_images[organ], point)
                     # dict_images[organ] = erode_at(dict_images[organ], point)
-                    # changed_mask = dilate_at(dict_images[organ], point)
-                    changed_mask = erode_at(dict_images[organ], point)
+                    changed_mask = dilate_at(dict_images[organ], point)
+                    # changed_mask = erode_at(dict_images[organ], point)
 
                     list_images = pre_processing(dict_images)
 
@@ -287,8 +287,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
 
 
-                    temp_pred_pert_tv = np.multiply(gt_prediction, changed_mask)
-                    temp_pred_gt = np.multiply(prediction,changed_mask)
+                    temp_pred_gt = np.multiply(gt_prediction, changed_mask)
+                    temp_pred_pert_tv = np.multiply(prediction,changed_mask)
                     absdiff = np.sum(np.abs(np.multiply(gt_prediction, changed_mask) - np.multiply(prediction,changed_mask)))
                     deltamax = np.max(np.abs(np.multiply(gt_prediction, changed_mask) - np.multiply(prediction,changed_mask)))
                     # perturb_prediction[organ][point[0], point[1], point[2]] = absdiff
@@ -392,7 +392,8 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [90, 82, 81]:
+    # for subject_id in [90, 82, 81, 95]:
+    for subject_id in [100, 86, 88]:
 
         # Start inference
         print("\n\n# Start inference !")
@@ -400,6 +401,6 @@ if __name__ == "__main__":
         inference_with_perturbation(
             trainer_,
             list_patient_dirs,
-            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_SinglePert_D12"),
+            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_SinglePert_D3_new"),
             do_TTA=args.TTA,
         )
