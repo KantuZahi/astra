@@ -198,8 +198,6 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     # dict_images[organ] = dilate_at(dict_images[organ], point)
                     dict_images[organ] = erode_at(dict_images[organ], point)
 
-
-
                     list_images = pre_processing(dict_images)
 
                     input_ = list_images[0]
@@ -230,14 +228,14 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         # max_val_gt = np.max(temp_pred_gt_oar)
                         max_gt_oar = np.max(temp_pred_gt_oar)
                         max_pert_oar = np.max(temp_pred_pert_oar)
-                        deltamax = np.max(np.abs(temp_pred_gt_oar - temp_pred_pert_oar))
+                        deltamax_oar = np.max(np.abs(temp_pred_gt_oar - temp_pred_pert_oar))
 
-                        perturb_prediction[oar][point[0], point[1], point[2]] = max_gt_oar
+                        perturb_prediction[oar][point[0], point[1], point[2]] = max_pert_oar
 
                     temp_pred_gt = np.multiply(gt_prediction, dict_images[organ])
                     temp_pred_pert = np.multiply(prediction, dict_images[organ])
                     absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
-                    deltamax = np.max(np.abs(temp_pred_gt - temp_pred_pert))
+                    deltamax_tv = np.max(np.abs(temp_pred_gt - temp_pred_pert))
                     max_gt_tv = np.max(temp_pred_gt)
                     max_pert_tv = np.max(temp_pred_pert)
                     # perturb_prediction[organ][point[0], point[1], point[2]] = absdiff
@@ -288,7 +286,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
 if __name__ == "__main__":
 
-    root_dir = "/Users/zahir/Documents/Github/astra/"
+    root_dir = "/home/studentshare/Documents/astra/"
     # root_dir = os.getcwd()
     model_dir = os.path.join(root_dir, "models")
     output_dir = os.path.join(root_dir, "output_perturb")
@@ -332,7 +330,7 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [90, 82, 81, 95]:
+    for subject_id in [90, 82, 81, 88]:
 
         # Start inference
         print("\n\n# Start inference !")
@@ -340,6 +338,6 @@ if __name__ == "__main__":
         inference_with_perturbation(
             trainer_,
             list_patient_dirs,
-            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_D3_DMax"),
+            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_E3_Max_old_version"),
             do_TTA=args.TTA,
         )
