@@ -160,6 +160,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 perturb_prediction_mean = {}
                 perturb_prediction_dmax = {}
                 perturb_prediction_dmean = {}
+                perturb_prediction_hr_hl_thresh = {}
 
                 prediction_tv = np.zeros_like(gt_prediction)
                 # perturb_prediction[organ] = np.zeros_like(gt_prediction)
@@ -175,6 +176,9 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     perturb_prediction_mean[oar] = np.zeros_like(gt_prediction)
                     perturb_prediction_dmax[oar] = np.zeros_like(gt_prediction)
                     perturb_prediction_dmean[oar] = np.zeros_like(gt_prediction)
+
+                    if (oar == "Hippocampus_L") or (oar == "Hippocampus_R"):
+                        perturb_prediction_hr_hl_thresh[oar] = np.zeros_like(gt_prediction)
 
 
                 prediction_tv += np.multiply(gt_prediction, dict_images[organ][0,:,:,:])
@@ -259,6 +263,10 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         perturb_prediction_dmax[oar][point[0], point[1], point[2]] = deltamax_oar
                         perturb_prediction_dmean[oar][point[0], point[1], point[2]] = deltamean_oar
 
+                        if (oar == "Hippocampus_L") or (oar == "Hippocampus_R"):
+                            numLargThresh = np.count_nonzero(temp_pred_pert_oar > 7.4)
+                            perturb_prediction_hr_hl_thresh[oar][point[0], point[1], point[2]] = numLargThresh
+
                     # get prediction (pert, gt) on only the tv
                     temp_pred_gt = np.multiply(gt_prediction, dict_images[organ])
                     temp_pred_pert = np.multiply(prediction, dict_images[organ])
@@ -319,20 +327,38 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                             os.mkdir(save_path + "/" + patient_id)
                         sitk.WriteImage(
                             prediction_max_nii,
-                            save_path + "/" + patient_id + "/Perturbed_TV_" + organ + "Max" + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "Max" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_mean_nii,
-                            save_path + "/" + patient_id + "/Perturbed_TV_" + organ + "Mean" + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "Mean" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_dmax_nii,
-                            save_path + "/" + patient_id + "/Perturbed_TV_" + organ + "DMax" + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "DMax" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_dmean_nii,
-                            save_path + "/" + patient_id + "/Perturbed_TV_" + organ + "DMean" + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "DMean" + ".nii.gz",
                         )
+                    if (oar == "Hippocampus_L") or (oar == "Hippocampus_R"):
+                        prediction_Hippo_Thresh_nii = sitk.GetImageFromArray(perturb_prediction_dmean[oar])
+                        prediction_Hippo_Thresh_nii = copy_sitk_imageinfo(templete_nii, prediction_Hippo_Thresh_nii)
+                        if sys == 'Windows':
+                            if not os.path.exists(save_path + "\\" + patient_id):
+                                os.mkdir(save_path + "\\" + patient_id)
+                            sitk.WriteImage(
+                                prediction_Hippo_Thresh_nii,
+                                save_path + "\\" + patient_id + "/NumAboveThresh_" + oar + ".nii.gz",
+                            )
+                        else:
+                            if not os.path.exists(save_path + "/" + patient_id):
+                                os.mkdir(save_path + "/" + patient_id)
+                            sitk.WriteImage(
+                                prediction_Hippo_Thresh_nii,
+                                save_path + "/" + patient_id + "/NumAboveThresh_" + oar + ".nii.gz",
+                            )
+
 
 
                 templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
@@ -438,7 +464,7 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [90, 82, 81, 95]:
+    for subject_id in [90, 82, 81, 88]:
 
         # Start inference
         print("\n\n# Start inference !")
