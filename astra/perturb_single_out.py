@@ -79,7 +79,7 @@ def erode_at(volume, point):
     """
     Erode the binary volume 'volume' at the point specified bt point.
     """
-    ball = skm.ball(5)
+    ball = skm.ball(7)
     # print(str(np.count_nonzero(ball)))
     # print(str(np.count_nonzero(volume)))
     point_vol = np.zeros(volume[0, :, :, :].shape, dtype=np.uint8)
@@ -88,6 +88,7 @@ def erode_at(volume, point):
     volume_out = volume[0, :, :, :].astype(np.uint8) - volume_out
     volume_out[volume_out >= 2] = 0
     volume_out = volume_out[np.newaxis, :, :, :]
+    # print(str(np.count_nonzero(volume_out)))
     return volume_out
 
 def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=True):
@@ -195,15 +196,15 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
                 print("\n Points on surface: ", len(point_set))
 
+                og_tv = dict_images[organ]
+
 
                 # At this stage, do perturbation on the organ boundary.
                 for point in tqdm(point_set):
-                    changed_mask = np.zeros_like(gt_prediction)
+                    dict_images[organ] = og_tv
                     ### put CTV into erode/ dilate function
                     # dict_images[organ] = dilate_at(dict_images[organ], point)
-                    # dict_images[organ] = erode_at(dict_images[organ], point)
-                    changed_mask = dilate_at(dict_images[organ], point)
-                    # changed_mask = erode_at(dict_images[organ], point)
+                    dict_images[organ] = erode_at(dict_images[organ], point)
 
                     list_images = pre_processing(dict_images)
 
@@ -246,8 +247,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
                         templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
                         prediction_nii = sitk.GetImageFromArray(perturb_prediction[oar])
-                        prediction_gt_nii = sitk.GetImageFromArray(perturb_prediction[oar])
-                        prediction_diff_nii = sitk.GetImageFromArray(perturb_prediction[oar])
+                        prediction_gt_nii = sitk.GetImageFromArray(prediction_gt[oar])
+                        prediction_diff_nii = sitk.GetImageFromArray(prediction_diff[oar])
 
                         prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
                         prediction_gt_nii = copy_sitk_imageinfo(templete_nii, prediction_gt_nii)
@@ -287,22 +288,24 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
 
 
-                    temp_pred_gt = np.multiply(gt_prediction, changed_mask)
-                    temp_pred_pert_tv = np.multiply(prediction,changed_mask)
-                    absdiff = np.sum(np.abs(np.multiply(gt_prediction, changed_mask) - np.multiply(prediction,changed_mask)))
-                    deltamax = np.max(np.abs(np.multiply(gt_prediction, changed_mask) - np.multiply(prediction,changed_mask)))
+                    temp_pred_gt = np.multiply(gt_prediction, dict_images[organ])
+                    temp_pred_pert_tv = np.multiply(prediction,dict_images[organ])
+                    absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
+                    deltamax = np.max(np.abs(temp_pred_gt - temp_pred_pert))
                     # perturb_prediction[organ][point[0], point[1], point[2]] = absdiff
                     perturb_prediction[organ] = temp_pred_pert_tv[0, :, :, :]
                     test_p_tv = perturb_prediction[organ]
                     prediction_gt[organ] = temp_pred_gt[0, :, :, :]
                     test_gt_tv = prediction_gt[organ]
+                    prediction_diff[organ] = np.absolute(perturb_prediction[organ]- prediction_gt[organ])
+
 
 
 
                     templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
                     prediction_nii = sitk.GetImageFromArray(perturb_prediction[organ])
-                    prediction_gt_nii = sitk.GetImageFromArray(perturb_prediction[organ])
-                    prediction_diff_nii = sitk.GetImageFromArray(perturb_prediction[organ])
+                    prediction_gt_nii = sitk.GetImageFromArray(prediction_gt[organ])
+                    prediction_diff_nii = sitk.GetImageFromArray(prediction_diff[organ])
 
                     prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
                     prediction_gt_nii = copy_sitk_imageinfo(templete_nii, prediction_gt_nii)
@@ -392,8 +395,7 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    # for subject_id in [90, 82, 81, 95]:
-    for subject_id in [100, 86, 88]:
+    for subject_id in [90]:#, 82, 81]: # , 88, 100, 95, 86]:
 
         # Start inference
         print("\n\n# Start inference !")
@@ -401,6 +403,6 @@ if __name__ == "__main__":
         inference_with_perturbation(
             trainer_,
             list_patient_dirs,
-            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_SinglePert_D3_new"),
+            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_SinglePert_E7_new_test"),
             do_TTA=args.TTA,
         )
