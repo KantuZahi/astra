@@ -308,38 +308,38 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                             os.mkdir(save_path + "\\" + patient_id)
                         sitk.WriteImage(
                             prediction_max_nii,
-                            save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "Max" + ".nii.gz",
+                            save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "_Max" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_mean_nii,
-                            save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "Mean" + ".nii.gz",
+                            save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "_Mean" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_dmax_nii,
-                            save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "DMax" + ".nii.gz",
+                            save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "_DMax" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_dmean_nii,
-                            save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "DMean" + ".nii.gz",
+                            save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "_DMean" + ".nii.gz",
                         )
                     else:
                         if not os.path.exists(save_path + "/" + patient_id):
                             os.mkdir(save_path + "/" + patient_id)
                         sitk.WriteImage(
                             prediction_max_nii,
-                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "Max" + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "_Max" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_mean_nii,
-                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "Mean" + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "_Mean" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_dmax_nii,
-                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "DMax" + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "_DMax" + ".nii.gz",
                         )
                         sitk.WriteImage(
                             prediction_dmean_nii,
-                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "DMean" + ".nii.gz",
+                            save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "_DMean" + ".nii.gz",
                         )
                     if (oar == "Hippocampus_L") or (oar == "Hippocampus_R"):
                         prediction_Hippo_Thresh_nii = sitk.GetImageFromArray(perturb_prediction_dmean[oar])
@@ -378,38 +378,38 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         os.mkdir(save_path + "\\" + patient_id)
                     sitk.WriteImage(
                         prediction_max_nii,
-                        save_path + "\\" + patient_id + "/Perturbed_" + organ + "Max" + ".nii.gz",
+                        save_path + "\\" + patient_id + "/Perturbed_" + organ + "_Max" + ".nii.gz",
                     )
                     sitk.WriteImage(
                         prediction_mean_nii,
-                        save_path + "\\" + patient_id + "/Perturbed_" + organ + "Mean" + ".nii.gz",
+                        save_path + "\\" + patient_id + "/Perturbed_" + organ + "_Mean" + ".nii.gz",
                     )
                     sitk.WriteImage(
                         prediction_dmax_nii,
-                        save_path + "\\" + patient_id + "/Perturbed_" + organ + "DMax" + ".nii.gz",
+                        save_path + "\\" + patient_id + "/Perturbed_" + organ + "_DMax" + ".nii.gz",
                     )
                     sitk.WriteImage(
                         prediction_dmean_nii,
-                        save_path + "\\" + patient_id + "/Perturbed_" + organ + "DMean" + ".nii.gz",
+                        save_path + "\\" + patient_id + "/Perturbed_" + organ + "_DMean" + ".nii.gz",
                     )
                 else:
                     if not os.path.exists(save_path + "/" + patient_id):
                         os.mkdir(save_path + "/" + patient_id)
                     sitk.WriteImage(
                         prediction_max_nii,
-                        save_path + "/" + patient_id + "/Perturbed_" + organ + "Max" + ".nii.gz",
+                        save_path + "/" + patient_id + "/Perturbed_" + organ + "_Max" + ".nii.gz",
                     )
                     sitk.WriteImage(
                         prediction_mean_nii,
-                        save_path + "/" + patient_id + "/Perturbed_" + organ + "Mean" + ".nii.gz",
+                        save_path + "/" + patient_id + "/Perturbed_" + organ + "_Mean" + ".nii.gz",
                     )
                     sitk.WriteImage(
                         prediction_dmax_nii,
-                        save_path + "/" + patient_id + "/Perturbed_" + organ + "DMax" + ".nii.gz",
+                        save_path + "/" + patient_id + "/Perturbed_" + organ + "_DMax" + ".nii.gz",
                     )
                     sitk.WriteImage(
                         prediction_dmean_nii,
-                        save_path + "/" + patient_id + "/Perturbed_" + organ + "DMean" + ".nii.gz",
+                        save_path + "/" + patient_id + "/Perturbed_" + organ + "_DMean" + ".nii.gz",
                     )
 
 
@@ -419,8 +419,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
 if __name__ == "__main__":
 
-    root_dir = "/Users/zahir/Documents/Github/astra/"
-    # root_dir = "/home/studentshare/Documents/astra/"
+    # root_dir = "/Users/zahir/Documents/Github/astra/"
+    root_dir = "/home/studentshare/Documents/astra/"
     # root_dir = os.getcwd()
     model_dir = os.path.join(root_dir, "models")
     output_dir = os.path.join(root_dir, "output_perturb")
