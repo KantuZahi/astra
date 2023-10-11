@@ -23,7 +23,6 @@ from astra.training.network_trainer import *
 PERT_SIZE = sys.argv[1]
 PERT_TYPE = sys.argv[2]
 
-
 def find_boundary_points(volume):
     """
     Find points on the boundary of a region of interest.
@@ -66,7 +65,6 @@ def dilate_at(volume, point):
     """
     Dilate the binary volume 'volume' at the point specified bt point.
     """
-    print(PERT_SIZE)
     ball = skm.ball(PERT_SIZE)
     # print(str(np.count_nonzero(ball)))
     # print(str(np.count_nonzero(volume)))
@@ -100,6 +98,9 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
     This function helps create perturbations in the OAR and the Target, and then evaluates the dose.
     """
     sys = platform.system()
+    list_target = ["Target"]
+    list_oar_names = ["BrainStem", "Hippocampus_L", "Hippocampus_R", "Eye_L", "Eye_R", "Chiasm", "OpticNerve_L",
+                      "OpticNerve_R"]  # "Cochlea_L", "Cochlea_R", "LacrimalGland_L", "LacrimalGland_R", "Pituitary"]
 
     if not os.path.exists(save_path):
         os.mkdir(save_path)
@@ -112,6 +113,15 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
             else:
                 patient_id = patient_dir.split("/")[-1]
             dict_images = read_data(patient_dir)
+
+            og_tv = dict_images[list_target[0]]
+
+            ball = skm.ball(1)
+            dil_vol_gt = np.zeros(og_tv.shape, dtype=np.uint8)
+            dil_vol_gt = skm.binary_dilation(og_tv[0, :, :, :], ball).astype(np.uint8)
+            dil_vol_gt = dil_vol_gt[np.newaxis, :, :, :]
+
+            dict_images[list_target[0]] = dil_vol_gt
 
             list_images = pre_processing(dict_images)
 
@@ -130,6 +140,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 np.logical_or(possible_dose_mask[0, :, :, :] < 1, prediction < 0)
             ] = 0
             gt_prediction = 70.0 * prediction
+
+            dict_images[list_target[0]] = og_tv
 
             templete_nii = sitk.ReadImage(patient_dir + "/Dose_Mask.nii.gz")
             prediction_nii = sitk.GetImageFromArray(gt_prediction)
@@ -151,8 +163,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     save_path + "/" + patient_id + "/Dose_gt.nii.gz",
                 )
 
-            list_target = ["Target"]
-            list_oar_names = ["BrainStem", "Hippocampus_L", "Hippocampus_R", "Eye_L", "Eye_R", "Chiasm", "OpticNerve_L", "OpticNerve_R"] # "Cochlea_L", "Cochlea_R", "LacrimalGland_L", "LacrimalGland_R", "Pituitary"]
+
+
 
 
             for organ in list_target:
@@ -214,7 +226,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 print("\n Points on surface: ", len(point_set))
 
                 # store mask of tv
-                og_tv = dict_images[organ]
+                # og_tv = dict_images[organ]
 
                 # At this stage, do perturbation on the organ boundary.
                 for point in tqdm(point_set):
@@ -228,6 +240,15 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     else:
                         print("Not allowed argument.")
 
+                    testCTVPert = dict_images[organ]
+
+                    ball = skm.ball(1)
+                    dil_vol = np.zeros(dict_images[organ].shape, dtype=np.uint8)
+                    dil_vol = skm.binary_dilation(dict_images[organ][0, :, :, :], ball).astype(np.uint8)
+                    # boundary_volume = volume_larger - og_tv[0, :, :, :]
+                    dil_vol = dil_vol[np.newaxis, :, :, :]
+
+                    dict_images[list_target[0]] = dil_vol
 
                     list_images = pre_processing(dict_images)
 
@@ -250,7 +271,6 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     # rescale and get gray (Gy)
                     prediction = 70.0 * prediction
 
-                    temp_val = 1.00E-07
 
                     # max/mean value of oar written into perturb location
                     for oar in list_oar_names:
@@ -283,7 +303,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                             perturb_prediction_hr_hl_thresh[oar][point[0], point[1], point[2]] = numLargThresh
 
                     # get prediction (pert, gt) on only the tv
-                    temp_pred_gt = np.multiply(gt_prediction, dict_images[organ])
+                    temp_pred_gt = np.multiply(gt_prediction, dil_vol_gt)
                     temp_pred_pert = np.multiply(prediction, dict_images[organ])
 
                     # calculate values of interest of the TV
@@ -389,8 +409,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 prediction_dmean_nii = copy_sitk_imageinfo(templete_nii, prediction_dmean_nii)
 
                 if sys == 'Windows':
-                    if not os.path.exists(save_path + "\\" + patient_id):
-                        os.mkdir(save_path + "\\" + patient_id)
+                    os.makedirs(save_path + "\\" + patient_id, exist_ok=True)
+
                     sitk.WriteImage(
                         prediction_max_nii,
                         save_path + "\\" + patient_id + "/Perturbed_" + organ + "_Max" + ".nii.gz",
@@ -408,7 +428,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         save_path + "\\" + patient_id + "/Perturbed_" + organ + "_DMean" + ".nii.gz",
                     )
                 else:
-                    if not os.path.exists(save_path + "/" + patient_id):
+                    if not os.path.exists(f"{save_path}{os.sep}{patient_id}"):
                         os.mkdir(save_path + "/" + patient_id)
                     sitk.WriteImage(
                         prediction_max_nii,
@@ -480,7 +500,7 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [81, 90, 82, 81, 88]:
+    for subject_id in [90, 81, 90, 82, 81, 88]:
 
         # Start inference
         print("\n\n# Start inference !")
