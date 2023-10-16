@@ -20,9 +20,8 @@ from astra.utils.data_utils import (
 from astra.model.model import Model
 from astra.training.network_trainer import *
 
-PERT_SIZE = sys.argv[1]
-PERT_TYPE = sys.argv[2]
-
+PERT_SIZE = 2
+PERT_TYPE = "D"
 
 def find_boundary_points(volume):
     """
@@ -101,8 +100,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
     """
     sys = platform.system()
 
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
+    os.makedirs(save_path, exist_ok=True)
 
     with torch.no_grad():
         trainer.setting.network.eval()
@@ -137,15 +135,13 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
 
             if sys == 'Windows':
-                if not os.path.exists(save_path + "\\" + patient_id):
-                    os.mkdir(save_path + "\\" + patient_id)
+                os.makedirs(save_path + "\\" + patient_id, exist_ok=True)
                 sitk.WriteImage(
                     prediction_nii,
                     save_path + "\\" + patient_id + "/Dose_gt.nii.gz",
                 )
             else:
-                if not os.path.exists(save_path + "/" + patient_id):
-                    os.mkdir(save_path + "/" + patient_id)
+                os.makedirs(save_path + "/" + patient_id, exist_ok=True)
                 sitk.WriteImage(
                     prediction_nii,
                     save_path + "/" + patient_id + "/Dose_gt.nii.gz",
@@ -191,15 +187,13 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 prediction_nii = sitk.GetImageFromArray(prediction_tv)
                 prediction_nii = copy_sitk_imageinfo(templete_nii, prediction_nii)
                 if sys == 'Windows':
-                    if not os.path.exists(save_path + "\\" + patient_id):
-                        os.mkdir(save_path + "\\" + patient_id)
+                    os.makedirs(save_path + "\\" + patient_id, exist_ok=True)
                     sitk.WriteImage(
                         prediction_nii,
                         save_path + "\\" + patient_id + "/Prediction_NoPert" + organ + ".nii.gz",
                     )
                 else:
-                    if not os.path.exists(save_path + "/" + patient_id):
-                        os.mkdir(save_path + "/" + patient_id)
+                    os.makedirs(save_path + "/" + patient_id, exist_ok=True)
                     sitk.WriteImage(
                         prediction_nii,
                         save_path + "/" + patient_id + "/Prediction_NoPert" + organ + ".nii.gz",
@@ -257,15 +251,16 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         # get prediction (pert, gt) on only the oar
                         temp_pred_gt_oar = np.multiply(gt_prediction, dict_images[oar])
                         temp_pred_pert_oar = np.multiply(prediction,dict_images[oar])
+                        size_oar = np. count_nonzero(temp_pred_gt_oar)
 
                         # calculate values of interest of the OAR
                         max_gt_oar = np.max(temp_pred_gt_oar)
                         max_pert_oar = np.max(temp_pred_pert_oar)
-                        mean_gt_oar = np.mean(temp_pred_gt_oar)
-                        mean_pert_oar = np.mean(temp_pred_pert_oar)
+                        mean_gt_oar = np.divide(np.sum(temp_pred_gt_oar), size_oar)
+                        mean_pert_oar = np.divide(np.sum(temp_pred_pert_oar), size_oar)
                         absdiff_oar = np.sum(abs(temp_pred_gt_oar - temp_pred_pert_oar))
                         deltamax_oar = np.abs(max_gt_oar - max_pert_oar)
-                        deltamean_oar = np.mean(mean_gt_oar- mean_pert_oar)
+                        deltamean_oar = np.abs(mean_gt_oar- mean_pert_oar)
 
 
                         # Save values of interest
@@ -283,14 +278,16 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                             perturb_prediction_hr_hl_thresh[oar][point[0], point[1], point[2]] = numLargThresh
 
                     # get prediction (pert, gt) on only the tv
-                    temp_pred_gt = np.multiply(gt_prediction, dict_images[organ])
+                    temp_pred_gt = np.multiply(gt_prediction, og_tv)
                     temp_pred_pert = np.multiply(prediction, dict_images[organ])
+                    size_tv_gt = np.count_nonzero(temp_pred_gt)
+                    size_tv_pert = np.count_nonzero(temp_pred_pert)
 
                     # calculate values of interest of the TV
                     max_gt_tv = np.max(temp_pred_gt)
                     max_pert_tv = np.max(temp_pred_pert)
-                    mean_gt_tv = np.mean(temp_pred_gt)
-                    mean_pert_tv = np.mean(temp_pred_pert)
+                    mean_gt_tv = np.divide(np.sum(temp_pred_gt), size_tv_gt)
+                    mean_pert_tv = np.divide(np.sum(temp_pred_pert), size_tv_pert)
                     absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
                     deltamax_tv = np.abs(max_gt_tv - max_pert_tv)
                     deltamean_tv = np.abs(mean_gt_tv - mean_pert_tv)
@@ -319,8 +316,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
 
                     if sys == 'Windows':
-                        if not os.path.exists(save_path + "\\" + patient_id):
-                            os.mkdir(save_path + "\\" + patient_id)
+                        os.makedirs(save_path + "\\" + patient_id, exist_ok=True)
                         sitk.WriteImage(
                             prediction_max_nii,
                             save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "_Max" + ".nii.gz",
@@ -338,8 +334,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                             save_path + "\\" + patient_id + "/Perturbed_TV_" + oar + "_DMean" + ".nii.gz",
                         )
                     else:
-                        if not os.path.exists(save_path + "/" + patient_id):
-                            os.mkdir(save_path + "/" + patient_id)
+                        os.makedirs(save_path + "/" + patient_id, exist_ok=True)
                         sitk.WriteImage(
                             prediction_max_nii,
                             save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "_Max" + ".nii.gz",
@@ -360,15 +355,13 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         prediction_Hippo_Thresh_nii = sitk.GetImageFromArray(perturb_prediction_dmean[oar])
                         prediction_Hippo_Thresh_nii = copy_sitk_imageinfo(templete_nii, prediction_Hippo_Thresh_nii)
                         if sys == 'Windows':
-                            if not os.path.exists(save_path + "\\" + patient_id):
-                                os.mkdir(save_path + "\\" + patient_id)
+                            os.makedirs(save_path + "\\" + patient_id, exist_ok=True)
                             sitk.WriteImage(
                                 prediction_Hippo_Thresh_nii,
                                 save_path + "\\" + patient_id + "/NumAboveThresh_" + oar + ".nii.gz",
                             )
                         else:
-                            if not os.path.exists(save_path + "/" + patient_id):
-                                os.mkdir(save_path + "/" + patient_id)
+                            os.makedirs(save_path + "/" + patient_id, exist_ok=True)
                             sitk.WriteImage(
                                 prediction_Hippo_Thresh_nii,
                                 save_path + "/" + patient_id + "/NumAboveThresh_" + oar + ".nii.gz",
@@ -389,8 +382,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                 prediction_dmean_nii = copy_sitk_imageinfo(templete_nii, prediction_dmean_nii)
 
                 if sys == 'Windows':
-                    if not os.path.exists(save_path + "\\" + patient_id):
-                        os.mkdir(save_path + "\\" + patient_id)
+                    os.makedirs(save_path + "\\" + patient_id, exist_ok=True)
                     sitk.WriteImage(
                         prediction_max_nii,
                         save_path + "\\" + patient_id + "/Perturbed_" + organ + "_Max" + ".nii.gz",
@@ -408,8 +400,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         save_path + "\\" + patient_id + "/Perturbed_" + organ + "_DMean" + ".nii.gz",
                     )
                 else:
-                    if not os.path.exists(save_path + "/" + patient_id):
-                        os.mkdir(save_path + "/" + patient_id)
+                    os.makedirs(save_path + "/" + patient_id, exist_ok=True)
                     sitk.WriteImage(
                         prediction_max_nii,
                         save_path + "/" + patient_id + "/Perturbed_" + organ + "_Max" + ".nii.gz",

@@ -138,3 +138,6 @@ dmypy.json
 .idea/webServers.xml
 .idea/deployment.xml
 .idea/sshConfigs.xml
+astra/test_with_perturb_dil_ero.py
+astra/test_with_perturbed_dp_allorgans.py
+astra/visualization/data_sorting.py
