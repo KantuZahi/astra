@@ -20,8 +20,8 @@ from astra.utils.data_utils import (
 from astra.model.model import Model
 from astra.training.network_trainer import *
 
-PERT_SIZE = sys.argv[1]
-PERT_TYPE = sys.argv[2]
+PERT_SIZE = 5
+PERT_TYPE = "D"
 
 def find_boundary_points(volume):
     """
@@ -272,15 +272,16 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         # get prediction (pert, gt) on only the oar
                         temp_pred_gt_oar = np.multiply(gt_prediction, dict_images[oar])
                         temp_pred_pert_oar = np.multiply(prediction,dict_images[oar])
+                        size_oar = np.count_nonzero(temp_pred_gt_oar)
 
                         # calculate values of interest of the OAR
                         max_gt_oar = np.max(temp_pred_gt_oar)
                         max_pert_oar = np.max(temp_pred_pert_oar)
-                        mean_gt_oar = np.mean(temp_pred_gt_oar)
-                        mean_pert_oar = np.mean(temp_pred_pert_oar)
+                        mean_gt_oar = np.divide(np.sum(temp_pred_gt_oar), size_oar)
+                        mean_pert_oar = np.divide(np.sum(temp_pred_pert_oar), size_oar)
                         absdiff_oar = np.sum(abs(temp_pred_gt_oar - temp_pred_pert_oar))
                         deltamax_oar = np.abs(max_gt_oar - max_pert_oar)
-                        deltamean_oar = np.mean(mean_gt_oar- mean_pert_oar)
+                        deltamean_oar = np.abs(mean_gt_oar- mean_pert_oar)
 
 
                         # Save values of interest
@@ -300,12 +301,14 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                     # get prediction (pert, gt) on only the tv
                     temp_pred_gt = np.multiply(gt_prediction, dil_vol_gt)
                     temp_pred_pert = np.multiply(prediction, dict_images[organ])
+                    size_tv_gt = np.count_nonzero(temp_pred_gt)
+                    size_tv_pert = np.count_nonzero(temp_pred_pert)
 
                     # calculate values of interest of the TV
                     max_gt_tv = np.max(temp_pred_gt)
                     max_pert_tv = np.max(temp_pred_pert)
-                    mean_gt_tv = np.mean(temp_pred_gt)
-                    mean_pert_tv = np.mean(temp_pred_pert)
+                    mean_gt_tv = np.divide(np.sum(temp_pred_gt), size_tv_gt)
+                    mean_pert_tv = np.divide(np.sum(temp_pred_pert), size_tv_pert)
                     absdiff = np.sum(abs(temp_pred_gt - temp_pred_pert))
                     deltamax_tv = np.abs(max_gt_tv - max_pert_tv)
                     deltamean_tv = np.abs(mean_gt_tv - mean_pert_tv)
@@ -444,8 +447,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
 if __name__ == "__main__":
 
-    root_dir = "/Users/zahir/Documents/Github/astra/"
-    # root_dir = "/home/studentshare/Documents/astra/"
+    # root_dir = "/Users/zahir/Documents/Github/astra/"
+    root_dir = "/home/studentshare/Documents/astra/"
     # root_dir = "/storage/homefs/zm13j051/astra/"
     # root_dir = os.getcwd()
     model_dir = os.path.join(root_dir, "models")
@@ -490,7 +493,7 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [90, 81, 90, 82, 81, 88]:
+    for subject_id in [90, 82, 81, 88]:
 
         # Start inference
         print("\n\n# Start inference !")
@@ -498,6 +501,6 @@ if __name__ == "__main__":
         inference_with_perturbation(
             trainer_,
             list_patient_dirs,
-            save_path=os.path.join(trainer_.setting.output_dir, "Prediction_" + PERT_TYPE + str(PERT_SIZE)),
+            save_path=os.path.join(trainer_.setting.output_dir, "PredictionPTV_" + PERT_TYPE + str(PERT_SIZE)),
             do_TTA=args.TTA,
         )

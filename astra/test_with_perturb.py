@@ -20,7 +20,7 @@ from astra.utils.data_utils import (
 from astra.model.model import Model
 from astra.training.network_trainer import *
 
-PERT_SIZE = 2
+PERT_SIZE = 5
 PERT_TYPE = "D"
 
 def find_boundary_points(volume):
@@ -65,7 +65,7 @@ def dilate_at(volume, point):
     """
     Dilate the binary volume 'volume' at the point specified bt point.
     """
-    print(PERT_SIZE)
+    # print(PERT_SIZE)
     ball = skm.ball(PERT_SIZE)
     # print(str(np.count_nonzero(ball)))
     # print(str(np.count_nonzero(volume)))
@@ -251,7 +251,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         # get prediction (pert, gt) on only the oar
                         temp_pred_gt_oar = np.multiply(gt_prediction, dict_images[oar])
                         temp_pred_pert_oar = np.multiply(prediction,dict_images[oar])
-                        size_oar = np. count_nonzero(temp_pred_gt_oar)
+                        size_oar = np.count_nonzero(temp_pred_gt_oar)
 
                         # calculate values of interest of the OAR
                         max_gt_oar = np.max(temp_pred_gt_oar)
@@ -260,7 +260,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                         mean_pert_oar = np.divide(np.sum(temp_pred_pert_oar), size_oar)
                         absdiff_oar = np.sum(abs(temp_pred_gt_oar - temp_pred_pert_oar))
                         deltamax_oar = np.abs(max_gt_oar - max_pert_oar)
-                        deltamean_oar = np.abs(mean_gt_oar- mean_pert_oar)
+                        deltamean_oar = np.mean(mean_gt_oar- mean_pert_oar)
 
 
                         # Save values of interest
@@ -425,8 +425,8 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
 
 if __name__ == "__main__":
 
-    root_dir = "/Users/zahir/Documents/Github/astra/"
-    # root_dir = "/home/studentshare/Documents/astra/"
+    # root_dir = "/Users/zahir/Documents/Github/astra/"
+    root_dir = "/home/studentshare/Documents/astra/"
     # root_dir = "/storage/homefs/zm13j051/astra/"
     # root_dir = os.getcwd()
     model_dir = os.path.join(root_dir, "models")
@@ -471,7 +471,7 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [81, 90, 82, 81, 88]:
+    for subject_id in [90, 82, 81, 88]:
 
         # Start inference
         print("\n\n# Start inference !")
