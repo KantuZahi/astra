@@ -15,7 +15,8 @@ from astra.model.loss import Loss
 
 if __name__ == "__main__":
 
-    repo_root = "/Users/zahir/Documents/Github/astra/"
+    # repo_root = "/Users/zahir/Documents/Github/astra/"
+    repo_root = "/home/studentshare/Documents/astra/"
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--batch_size", type=int, default=2, help="batch size for training (default: 2)"
@@ -52,7 +53,7 @@ if __name__ == "__main__":
 
     list_eval_dirs = [
         os.path.join(repo_root, "data/processed-dldp/DLDP_") + str(i).zfill(3)
-        for i in range(62, 80)
+        for i in [62, 64, 66, 68, 69]
         if i not in [63, 65, 67, 77]  # missing data
     ]
 

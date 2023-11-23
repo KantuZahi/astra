@@ -20,8 +20,8 @@ from astra.utils.data_utils import (
 from astra.model.model import Model
 from astra.training.network_trainer import *
 
-PERT_SIZE = 5
-PERT_TYPE = "D"
+PERT_SIZE = 3
+PERT_TYPE = "E"
 
 def find_boundary_points(volume):
     """
@@ -352,7 +352,7 @@ def inference_with_perturbation(trainer, list_patient_dirs, save_path, do_TTA=Tr
                             save_path + "/" + patient_id + "/Perturbed_TV_" + oar + "_DMean" + ".nii.gz",
                         )
                     if (oar == "Hippocampus_L") or (oar == "Hippocampus_R"):
-                        prediction_Hippo_Thresh_nii = sitk.GetImageFromArray(perturb_prediction_dmean[oar])
+                        prediction_Hippo_Thresh_nii = sitk.GetImageFromArray(perturb_prediction_hr_hl_thresh[oar])
                         prediction_Hippo_Thresh_nii = copy_sitk_imageinfo(templete_nii, prediction_Hippo_Thresh_nii)
                         if sys == 'Windows':
                             os.makedirs(save_path + "\\" + patient_id, exist_ok=True)
@@ -430,7 +430,7 @@ if __name__ == "__main__":
     # root_dir = "/storage/homefs/zm13j051/astra/"
     # root_dir = os.getcwd()
     model_dir = os.path.join(root_dir, "models")
-    output_dir = os.path.join(root_dir, "output_perturb")
+    output_dir = os.path.join(root_dir, "output_perturb/newModel")
     os.makedirs(output_dir, exist_ok=True)
 
     gt_dir = os.path.join(root_dir, "data", "processed-dldp")
@@ -471,7 +471,7 @@ if __name__ == "__main__":
         ckpt_file=args.model_path, list_GPU_ids=[args.GPU_id], only_network=True
     )
 
-    for subject_id in [90, 82, 81, 88]:
+    for subject_id in [91, 92, 93, 94, 95, 96, 97, 98, 99, 100]:
 
         # Start inference
         print("\n\n# Start inference !")
